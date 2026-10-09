@@ -1,0 +1,175 @@
+{
+  "name": "Venus ERP Chatbot",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "d4c96615-e0a7-4d88-b7e4-743a1351d3bb",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        -160
+      ],
+      "webhookId": "a1000000-0000-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the Production MIS analyst for Venus Pipes and Tubes. Answer management questions using ONLY data from the MySQL database venuserp_replica.\n\nALLOWED VIEWS (only these 8): VIEW_JOB_CARDWISE_PROD_PBI, VIEW_TUBING_PBI, VIEW_CUTTING_SCRAP_PBI, VIEW_LSAW_PBI, VIEW_WELD_COND_PBI, VIEW_WELDED_TUBING_PBI, VIEW_SLITTING_PBI, VIEW_WELDED_SCRAP_PBI.\n\nFOR EVERY QUESTION:\n1. Call tool get_schema first to see real column names and data types. Never invent or guess column names.\n2. Choose the correct view(s) and date column. If ambiguous, ask a short clarifying question.\n3. Call run_select_query with ONE read-only SELECT. Only the 8 views; never SELECT *; aggregate or LIMIT 200 max; explicit date ranges; no semicolons, comments or multiple statements.\n4. If a query errors, fix it once or twice; if it still fails, tell the user plainly. Never fabricate results.\n\nUNITS AND DEFINITIONS: Verify the unit (kg, tonnes, pieces) from column names, types and sample values before converting to MT; if unclear, state the assumption and ask. Do not assume views share units or scrap formulas, and do not assume scrap% = scrap/production unless confirmed. State the formula used. 'Yesterday' = previous calendar day in Asia/Calcutta. 'This month'/'previous month' = calendar months unless the user says financial year (India FY starts 1 April). State the date range used.\n\nISSUES: Call something an issue only when compared with a previous period, history, or a target/threshold the user gave. Never invent targets or expected values. Never call something critical without such a basis.\n\nANSWER FORMAT (use what fits): Executive summary; Key KPIs; Detailed breakdown (markdown table); Comparison with previous period; Critical observations (what happened, figures, why it matters, possible causes labelled HYPOTHESIS, next steps, data limitations); Recommended actions (labelled AI-generated suggestions); Data used (views, columns, date range, assumptions, SQL run).\nSeparate 'From database' facts from 'AI interpretation'. Every number must come from a query result. If data is missing, say so.",
+          "maxIterations": 8
+        }
+      },
+      "id": "b281975a-b491-4563-abe5-ba4c3e2e52e2",
+      "name": "MIS AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -32,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 100
+      },
+      "id": "cd50e984-58d2-4770-aa67-b4439dbafea2",
+      "name": "Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = 'venuserp_replica' AND TABLE_NAME IN ('VIEW_JOB_CARDWISE_PROD_PBI','VIEW_TUBING_PBI','VIEW_CUTTING_SCRAP_PBI','VIEW_LSAW_PBI','VIEW_WELD_COND_PBI','VIEW_WELDED_TUBING_PBI','VIEW_SLITTING_PBI','VIEW_WELDED_SCRAP_PBI') ORDER BY TABLE_NAME, ORDINAL_POSITION",
+        "options": {}
+      },
+      "id": "bd73e151-e081-4654-9310-81ef1416f8b8",
+      "name": "get_schema",
+      "type": "n8n-nodes-base.mySqlTool",
+      "typeVersion": 2.4,
+      "position": [
+        192,
+        32
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "7grUYihKY0OO4lLT",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Runs ONE read-only SELECT on the approved venuserp_replica views and returns rows. Single SELECT, no semicolon, explicit columns, aggregated or LIMIT 200 max.",
+        "operation": "executeQuery",
+        "query": "={{ $fromAI('sql_query', 'A single read-only MySQL SELECT on the approved views. No semicolon, no comments, no SELECT *, LIMIT 200 max.', 'string') }}",
+        "options": {}
+      },
+      "id": "1b673268-4d40-43d0-992f-5223d3fc63d7",
+      "name": "run_select_query",
+      "type": "n8n-nodes-base.mySqlTool",
+      "typeVersion": 2.4,
+      "position": [
+        384,
+        -16
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "7grUYihKY0OO4lLT",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        48
+      ],
+      "id": "5a0d9782-5adf-4171-a962-ccfff32f4207",
+      "name": "Google Gemini Chat Model"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "MIS AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "MIS AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_schema": {
+      "ai_tool": [
+        [
+          {
+            "node": "MIS AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_select_query": {
+      "ai_tool": [
+        [
+          {
+            "node": "MIS AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "MIS AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e332a7c8-6e03-4e46-bda3-2b43a64ac7db",
+  "meta": {
+    "instanceId": "080ee5ec9125b8a9bbcffd468dbd44965bfcd52a88481e6b11c692e2a83a3fb7"
+  },
+  "nodeGroups": [],
+  "id": "6Ta6ZZu1ImmvpWJF",
+  "tags": []
+}
