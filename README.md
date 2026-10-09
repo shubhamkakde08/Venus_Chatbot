@@ -1,4 +1,4 @@
-# Venus_Chatbot
+# Venus ERP Chatbot
 
 
 **AI-powered Manufacturing MIS & Production Analytics for Venus Pipes and Tubes**
